@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Ordem de Serviço | Oficina Mecânica</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/flowbite/1.6.5/flowbite.min.css" rel="stylesheet" />
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1E40AF',
+                        secondary: '#3B82F6',
+                        light: '#F3F4F6',
+                        dark: '#1F2937',
+                        success: '#10B981',
+                        warning: '#F59E0B',
+                        danger: '#EF4444',
+                        info: '#93C5FD'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #c5c5c5;
+            border-radius: 5px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a5a5a5;
+        }
+        
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .animate-fadeIn {
+            animation: fadeIn 0.3s ease forwards;
+        }
+        
+        /* Sticky table header */
+        .table-sticky thead tr th {
+            position: sticky;
+            top: 0;
+            background-color: #f8fafc;
+            z-index: 10;
+        }
+        
+        /* Status badges */
+        .status-badge {
+            @apply px-2 py-1 rounded-full text-xs font-medium;
+        }
+        
+        .status-em-andamento {
+            @apply bg-orange-100 text-orange-800;
+        }
+        
+        .status-finalizado {
+            @apply bg-blue-100 text-blue-800;
+        }
+        
+        .status-entregue {
+            @apply bg-green-100 text-green-800;
+        }
+        
+        .status-cancelado {
+            @apply bg-red-100 text-red-800;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <header class="bg-primary text-white shadow-md">
+        <div class="container mx-auto px-4 py-4 flex flex-col md:flex-row items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <i class="fas fa-car text-2xl"></i>
+                <h1 class="text-xl md:text-2xl font-bold">Sistema de Ordem de Serviço</h1>
+            </div>
+            <div class="mt-4 md:mt-0 flex items-center space-x-3">
+                <div class="relative">
+                    <input id="searchInput" type="text" placeholder="Buscar ordem..." class="px-4 py-2 rounded-full text-dark focus:outline-none focus:ring-2 focus:ring-secondary">
+                    <i class="fas fa-search absolute right-3 top-2.5 text-gray-400"></i>
+                </div>
+                <button onclick="openExportImportModal()" class="bg-white text-primary px-4 py-2 rounded-full font-medium hover:bg-gray-100 transition">
+                    <i class="fas fa-file-export mr-2"></i>Exportar/Importar
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Dashboard Stats -->
+    <div class="container mx-auto px-4 py-6">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white shadow rounded-lg p-4 flex items-center justify-between">
+                <div>
+                    <p class="text-gray-500">Total Ordens</p>
+                    <h3 class="text-2xl font-bold" id="totalOrders">0</h3>
+                </div>
+                <i class="fas fa-clipboard-list text-blue-500 text-3xl"></i>
+            </div>
+            <div class="bg-white shadow rounded-lg p-4 flex items-center justify-between">
+                <div>
+                    <p class="text-gray-500">Em Andamento</p>
+                    <h3 class="text-2xl font-bold" id="pendingOrders">0</h3>
+                </div>
+                <i class="fas fa-tools text-orange-500 text-3xl"></i>
+            </div>
+            <div class="bg-white shadow rounded-lg p-4 flex items-center justify-between">
+                <div>
+                    <p class="text-gray-500">Entregues</p>
+                    <h3 class="text-2xl font-bold" id="deliveredOrders">0</h3>
+                </div>
+                <i class="fas fa-check-circle text-green-500 text-3xl"></i>
+            </div>
+            <div class="bg-white shadow rounded-lg p-4 flex items-center justify-between">
+                <div>
+                    <p class="text-gray-500">Receita Total</p>
+                    <h3 class="text-2xl font-bold" id="totalRevenue">R$ 0,00</h3>
+                </div>
+                <i class="fas fa-dollar-sign text-purple-500 text-3xl"></i>
+            </div>
+        </div>
+
+        <!-- Actions and Filters -->
+        <div class="bg-white shadow rounded-lg p-4 mb-6">
+            <div class="flex flex-col md:flex-row items-start md:items-center justify-between">
+                <div class="mb-4 md:mb-0">
+                    <h2 class="text-lg font-semibold text-gray-800">Ordens de Serviço</h2>
+                    <p class="text-gray-500 text-sm">Gerencie todas as ordens de serviço da oficina</p>
+                </div>
+                <div class="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                    <button onclick="toggleFilterPanel()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg">
+                        <i class="fas fa-filter mr-2"></i>Filtros
+                    </button>
+                    <button onclick="openOrderModal()" class="px-4 py-2 bg-primary hover:bg-blue-700 text-white rounded-lg flex items-center">
+                        <i class="fas fa-plus mr-2"></i>Nova Ordem
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Filter Panel -->
+            <div id="filterPanel" class="mt-4 p-4 bg-gray-50 rounded-lg hidden">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-gray-700 text-sm font-medium mb-1">Status</label>
+                        <select id="filterStatus" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary">
+                            <option value="">Todos os Status</option>
+                            <option value="Em andamento">Em andamento</option>
+                            <option value="Finalizado">Finalizado</option>
+                            <option value="Entregue">Entregue</option>
+                            <option value="Cancelado">Cancelado</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 text-sm font-medium mb-1">Data de Entrada (De)</label>
+                        <input id="filterStartDate" type="date" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary">
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 text-sm font-medium mb-1">Data de Entrada (Até)</label>
+                        <input id="filterEndDate" type="date" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary">
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 text-sm font-medium mb-1">Mecânico</label>
+                        <input id="filterMechanic" type="text" placeholder="Nome do mecânico" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary">
+                    </div>
+                </div>
+                <div class="flex justify-end mt-4">
+                    <button onclick="applyFilters()" class="px-4 py-2 bg-secondary text-white rounded-lg hover:bg-blue-600 transition">Aplicar Filtros</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Orders Table -->
+        <div class="bg-white shadow rounded-lg overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="min-w-full table-sticky">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
+                            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Veículo</th>
+                            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Entrada</th>
+                            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mecânico</th>
+                            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ordersTableBody" class="bg-white divide-y divide-gray-200">
+                        <!-- Orders will be dynamically inserted here -->
+                    </tbody>
+                </table>
+            </div>
+            <div id="noOrdersMessage" class="p-8 text-center hidden">
+                <i class="fas fa-car text-5xl text-gray-300 mb-4"></i>
+                <h3 class="text-xl font-medium text-gray-500">Nenhuma ordem de serviço encontrada</h3>
+                <p class="text-gray-400 mt-2">Comece adicionando uma nova ordem de serviço</p>
+                <button onclick="openOrderModal()" class="mt-4 px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 transition">
+                    <i class="fas fa-plus mr-2"></i>Adicionar primeira ordem
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Order Modal -->
+    <div id="orderModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-lg shadow-xl w-11/12 md:w-4/5 lg:w-3/4 max-h-[90vh] overflow-y-auto animate-fadeIn">
+            <div class="p-4 bg-primary text-white rounded-t-lg flex justify-between items-center">
+                <h3 class="text-xl font-bold" id="modalTitle">Nova Ordem de Serviço</h3>
+                <button onclick="closeOrderModal()" class="text-white hover:text-gray-200">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="orderForm" class="p-6">
+                <input type="hidden" id="orderId">
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <h4 class="text-lg font-medium text-gray-800 border-b pb-2 mb-4">Dados do Cliente</h4>
+                        
+                        <div class="mb-4">
+                            <label for="customerName" class="block text-sm font-medium text-gray-700 mb-1">Nome do Cliente *</label>
+                            <input type="text" id="customerName" required class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="customerPhone" class="block text-sm font-medium text-gray-700 mb-1">Telefone/WhatsApp *</label>
+                            <input type="text" id="customerPhone" maxlength="15" required class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary" placeholder="(00) 00000-0000">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="customerCpfCnpj" class="block text-sm font-medium text-gray-700 mb-1">CPF/CNPJ</label>
+                            <input type="text" id="customerCpfCnpj" maxlength="18" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary" placeholder="000.000.000-00 ou 00.000.000/0000-00">
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h4 class="text-lg font-medium text-gray-800 border-b pb-2 mb-4">Dados do Veículo</h4>
+                        
+                        <div class="mb-4">
+                            <label for="vehicleBrand" class="block text-sm font-medium text-gray-700 mb-1">Marca *</label>
+                            <input type="text" id="vehicleBrand" required class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="vehicleModel" class="block text-sm font-medium text-gray-700 mb-1">Modelo *</label>
+                            <input type="text" id="vehicleModel" required class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary">
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label for="vehicleYear" class="block text-sm font-medium text-gray-700 mb-1">Ano *</label>
+                                <input type="text" id="vehicleYear" required class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary">
+                            </div>
+                            
+                            <div>
+                                <label for="vehiclePlate" class="block text-sm font-medium text-gray-700 mb-1">Placa *</label>
+                                <input type="text" id="vehiclePlate" required class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mb-6">
+                    <h4 class="text-lg font-medium text-gray-800 border-b pb-2 mb-4">Detalhes do Serviço</h4>
+                    
+                    <div class="mb-4">
+                        <label for="serviceDescription" class="block text-sm font-medium text-gray-700 mb-1">Descrição do Problema *</label>
+                        <textarea id="serviceDescription" required class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Itens do Orçamento</label>
+                        <div id="budgetItemsContainer" class="space-y-2 mb-2">
+                            <!-- Items will be added here -->
+                        </div>
+                        <div class="flex space-x-2">
+                            <input type="text" id="itemDescription" placeholder="Descrição" class="flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary">
+                            <input type="number" id="itemValue" placeholder="Valor" step="0.01" min="0" class="w-24 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary">
+                            <button type="button" onclick="addBudgetItem()" class="px-3 py-2 bg-secondary text-white rounded-lg hover:bg-blue-600">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <h4 class="text-lg font-medium text-gray-800 border-b pb-2 mb-4">Dados do Serviço</h4>
+                        
+                        <div class="mb-4">
+                            <label for="entryDate" class="block text-sm font-medium text-gray-700 mb-1">Data de Entrada *</label>
+                            <input type="datetime-local" id="entryDate" required class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="deliveryDate" class="block text-sm font-medium text-gray-700 mb-1">Data de Entrega Prevista</label>
+                            <input type="date" id="deliveryDate" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="mechanic" class="block text-sm font-medium text-gray-700 mb-1">Mecânico Responsável</label>
+                            <input type="text" id="mechanic" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="serviceStatus" class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                            <select id="serviceStatus" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary">
+                                <option value="Em andamento">Em andamento</option>
+                                <option value="Finalizado">Finalizado</option>
+                                <option value="Entregue">Entregue</option>
+                                <option value="Cancelado">Cancelado</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h4 class="text-lg font-medium text-gray-800 border-b pb-2 mb-4">Financeiro</h4>
+                        
+                        <div class="mb-4">
+                            <label for="totalValue" class="block text-sm font-medium text-gray-700 mb-1">Valor Total (R$)</label>
+                            <input type="number" id="totalValue" step="0.01" min="0" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="amountReceived" class="block text-sm font-medium text-gray-700 mb-1">Valor Recebido (R$)</label>
+                            <input type="number" id="amountReceived" step="0.01" min="0" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="paymentMethod" class="block text-sm font-medium text-gray-700 mb-1">Forma de Pagamento</label>
+                            <select id="paymentMethod" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary">
+                                <option value="">Selecione</option>
+                                <option value="Dinheiro">Dinheiro</option>
+                                <option value="PIX">PIX</option>
+                                <option value="Cartão de Crédito">Cartão de Crédito</option>
+                                <option value="Cartão de Débito">Cartão de Débito</option>
+                                <option value="Boleto">Boleto</option>
+                                <option value="Transferência">Transferência Bancária</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mb-4">
+                    <label for="finalNotes" class="block text-sm font-medium text-gray-700 mb-1">Observações Finais</label>
+                    <textarea id="finalNotes" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary" rows="2"></textarea>
+                </div>
+                
+                <div class="flex justify-end pt-4 space-x-4">
+                    <button type="button" onclick="closeOrderModal()" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-primary hover:bg-blue-700 text-white rounded-lg transition">Salvar Ordem</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Status Selection Modal -->
+    <div id="statusModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-lg shadow-xl w-11/12 md:w-96 p-6 animate-fadeIn">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-gray-800">Alterar Status</h3>
+                <button onclick="closeStatusModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <input type="hidden" id="statusOrderId">
+            
+            <div class="mb-4">
+                <label for="newStatus" class="block text-sm font-medium text-gray-700 mb-2">Selecione o novo status:</label>
+                <select id="newStatus" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary">
+                    <option value="Em andamento">Em andamento</option>
+                    <option value="Finalizado">Finalizado</option>
+                    <option value="Entregue">Entregue</option>
+                    <option value="Cancelado">Cancelado</option>
+                </select>
+            </div>
+            
+            <div class="flex justify-end space-x-3">
+                <button type="button" onclick="closeStatusModal()" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Cancelar</button>
+                <button type="button" onclick="updateOrderStatus()" class="px-4 py-2 bg-secondary hover:bg-blue-600 text-white rounded-lg transition">Atualizar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export/Import Modal -->
+    <div id="exportImportModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-lg shadow-xl w-11/12 md:w-2/3 max-h-[90vh] overflow-y-auto animate-fadeIn">
+            <div class="p-4 bg-secondary text-white rounded-t-lg flex justify-between items-center">
+                <h3 class="text-xl font-bold">Exportar/Importar Dados</h3>
+                <button onclick="closeExportImportModal()" class="text-white hover:text-gray-200">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <!-- Export Section -->
+                    <div>
+                        <h4 class="text-lg font-medium text-gray-800 mb-4">Exportar Dados</h4>
+                        <p class="text-gray-600 mb-4">Exporte todas as ordens de serviço para um arquivo JSON que pode ser importado posteriormente.</p>
+                        <div class="flex">
+                            <button onclick="exportData()" class="flex items-center px-4 py-2 bg-primary hover:bg-blue-700 text-white rounded-lg transition">
+                                <i class="fas fa-file-export mr-2"></i>Exportar Dados
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Import Section -->
+                    <div>
+                        <h4 class="text-lg font-medium text-gray-800 mb-4">Importar Dados</h4>
+                        <p class="text-gray-600 mb-4">Importe ordens de serviço a partir de um arquivo JSON. <span class="text-red-500">Atenção: isso substituirá todos os dados atuais!</span></p>
+                        <div class="relative">
+                            <input type="file" id="importFile" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                            <div class="px-4 py-3 bg-gray-100 rounded-lg border border-dashed border-gray-300 text-center cursor-pointer">
+                                <i class="fas fa-file-import text-3xl text-gray-400 mb-2"></i>
+                                <p class="text-gray-600 font-medium">Clique para selecionar um arquivo</p>
+                                <p class="text-sm text-gray-500" id="fileName">Nenhum arquivo selecionado</p>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex">
+                            <button onclick="importData()" class="flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition">
+                                <i class="fas fa-file-import mr-2"></i>Importar Dados
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white p-6 rounded-lg shadow-lg flex flex-col items-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
+            <p class="text-gray-700 font-medium">Carregando dados...</p>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/flowbite/1.6.5/flowbite.min.js"></script>
+    <script>
+        // DOM Elements
+        const orderModal = document.getElementById('orderModal');
+        const statusModal = document.getElementById('statusModal');
+        const exportImportModal = document.getElementById('exportImportModal');
+        const ordersTableBody = document.getElementById('ordersTableBody');
+        const noOrdersMessage = document.getElementById('noOrdersMessage');
+        const orderForm = document.getElementById('orderForm');
+        const searchInput = document.getElementById('searchInput');
+        const filterPanel = document.getElementById('filterPanel');
+        const importFile = document.getElementById('importFile');
+        const fileName = document.getElementById('fileName');
+        
+        // Order data structure
+        let orders = [];
+        
+        // Initialize application
+        document.addEventListener('DOMContentLoaded', function() {
+            loadOrders();
+            setupEventListeners();
+        });
+        
+        // Set up event listeners
+        function setupEventListeners() {
+            // Form submission
+            orderForm.addEventListener('submit', saveOrder);
+            
+            // Search functionality
+            searchInput.addEventListener('input', filterOrders);
+            
+            // Import file selection
+            importFile.addEventListener('change', function(e) {
+                if (e.target.files.length > 0) {
+                    fileName.textContent = e.target.files[0].name;
+                }
+            });
+
+            // Mask inputs
+            const phoneInput = document.getElementById('customerPhone');
+            const cpfCnpjInput = document.getElementById('customerCpfCnpj');
+            
+            phoneInput.addEventListener('input', () => applyPhoneMask(phoneInput));
+            cpfCnpjInput.addEventListener('input', () => applyCpfCnpjMask(cpfCnpjInput));
+        }
+        
+        // Load orders from localStorage
+        function loadOrders() {
+            showLoading(true);
+            
+            // Simulate loading delay (for demo purposes)
+            setTimeout(() => {
+                const storedOrders = localStorage.getItem('serviceOrders');
+                orders = storedOrders ? JSON.parse(storedOrders) : [];
+                
+                // Calculate dashboard stats
+                updateDashboardStats();
+                
+                // Render orders
+                renderOrders(orders);
+                
+                showLoading(false);
+            }, 500);
+        }
+        
+        // Save orders to localStorage
+        function saveOrders() {
+            localStorage.setItem('serviceOrders', JSON.stringify(orders));
+            updateDashboardStats();
+        }
+        
+        // Render orders to the table
+        function renderOrders(ordersToRender) {
+            if (ordersToRender.length === 0) {
+                ordersTableBody.innerHTML = '';
+                noOrdersMessage.classList.remove('hidden');
+                return;
+            }
+            
+            noOrdersMessage.classList.add('hidden');
+            
+            // Sort by date (newest first)
+            const sortedOrders = [...ordersToRender].sort((a, b) => 
+                new Date(b.entryDate) - new Date(a.entryDate)
+            );
+            
+            let html = '';
+            sortedOrders.forEach(order => {
+                // Format dates
+                const entryDate = new Date(order.entryDate).toLocaleString();
+                const deliveryDate = order.deliveryDate ? new Date(order.deliveryDate).toLocaleDateString() : '--';
+                
+                // Get status badge class
+                let statusClass = '';
+                switch(order.status) {
+                    case 'Em andamento': statusClass = 'status-em-andamento'; break;
+                    case 'Finalizado': statusClass = 'status-finalizado'; break;
+                    case 'Entregue': statusClass = 'status-entregue'; break;
+                    case 'Cancelado': statusClass = 'status-cancelado'; break;
+                }
+                
+                html += `
+                    <tr class="hover:bg-gray-50">
+                        <td class="py-3 px-4 text-sm text-gray-700 font-medium">#${order.id}</td>
+                        <td class="py-3 px-4">
+                            <div class="text-sm text-gray-900">${order.customerName}</div>
+                            <div class="text-sm text-gray-500">${order.customerPhone}</div>
+                        </td>
+                        <td class="py-3 px-4">
+                            <div class="text-sm text-gray-900">${order.vehicleBrand} ${order.vehicleModel}</div>
+                            <div class="text-sm text-gray-500">${order.vehicleYear} - ${order.vehiclePlate}</div>
+                        </td>
+                        <td class="py-3 px-4 text-sm text-gray-500">${entryDate}</td>
+                        <td class="py-3 px-4 text-sm text-gray-500">${order.mechanic || '--'}</td>
+                        <td class="py-3 px-4">
+                            <div class="text-sm text-gray-900">R$ ${parseFloat(order.totalValue || 0).toFixed(2)}</div>
+                            <div class="text-xs text-gray-500">Pago: R$ ${parseFloat(order.amountReceived || 0).toFixed(2)}</div>
+                        </td>
+                        <td class="py-3 px-4">
+                            <span class="status-badge ${statusClass}">${order.status}</span>
+                        </td>
+                        <td class="py-3 px-4">
+                            <div class="flex space-x-1">
+                                <button onclick="openStatusModal(${order.id})" class="p-1.5 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200">
+                                    <i class="fas fa-exchange-alt text-sm"></i>
+                                </button>
+                                <button onclick="editOrder(${order.id})" class="p-1.5 rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200">
+                                    <i class="fas fa-edit text-sm"></i>
+                                </button>
+                                <button onclick="deleteOrder(${order.id})" class="p-1.5 rounded-full bg-red-100 text-red-700 hover:bg-red-200 ${order.status === 'Cancelado' ? '' : 'opacity-50 cursor-not-allowed'}" ${order.status === 'Cancelado' ? '' : 'disabled'}>
+                                    <i class="fas fa-trash text-sm"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            ordersTableBody.innerHTML = html;
+        }
+        
+        // Update dashboard statistics
+        function updateDashboardStats() {
+            document.getElementById('totalOrders').textContent = orders.length;
+            
+            const pendingOrders = orders.filter(order => 
+                order.status === 'Em andamento' || order.status === 'Finalizado'
+            ).length;
+            document.getElementById('pendingOrders').textContent = pendingOrders;
+            
+            const deliveredOrders = orders.filter(order => 
+                order.status === 'Entregue'
+            ).length;
+            document.getElementById('deliveredOrders').textContent = deliveredOrders;
+            
+            const totalRevenue = orders.reduce((sum, order) => 
+                sum + parseFloat(order.amountReceived || 0), 0);
+            document.getElementById('totalRevenue').textContent = 
+                `R$ ${totalRevenue.toFixed(2)}`;
+        }
+        
+        // Open modal for new order
+        function openOrderModal() {
+            document.getElementById('modalTitle').textContent = 'Nova Ordem de Serviço';
+            document.getElementById('orderId').value = '';
+            
+            // Clear form
+            orderForm.reset();
+            document.getElementById('entryDate').value = new Date().toISOString().slice(0, 16);
+            
+            orderModal.classList.remove('hidden');
+        }
+        
+        // Close order modal
+        function closeOrderModal() {
+            orderModal.classList.add('hidden');
+        }
+        
+        // Open modal for editing an order
+        function editOrder(id) {
+            const order = orders.find(o => o.id === id);
+            if (!order) return;
+            
+            document.getElementById('modalTitle').textContent = 'Editar Ordem de Serviço';
+            document.getElementById('orderId').value = order.id;
+            
+            // Fill form with order data
+            document.getElementById('customerName').value = order.customerName || '';
+            document.getElementById('customerPhone').value = order.customerPhone || '';
+            document.getElementById('customerCpfCnpj').value = order.cpfCnpj || '';
+            document.getElementById('vehicleBrand').value = order.vehicleBrand || '';
+            document.getElementById('vehicleModel').value = order.vehicleModel || '';
+            document.getElementById('vehicleYear').value = order.vehicleYear || '';
+            document.getElementById('vehiclePlate').value = order.vehiclePlate || '';
+            document.getElementById('serviceDescription').value = order.description || '';
+            
+            // Add existing budget items
+            const container = document.getElementById('budgetItemsContainer');
+            container.innerHTML = '';
+            
+            if (order.items) {
+                Object.entries(order.items).forEach(([description, value]) => {
+                    const itemId = Date.now();
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'flex items-center space-x-2 bg-gray-50 p-2 rounded-lg';
+                    itemDiv.innerHTML = `
+                        <div class="flex-1">
+                            <span class="text-sm font-medium">${description}</span>
+                            <span class="text-sm text-gray-500 ml-2">R$ ${parseFloat(value).toFixed(2)}</span>
+                        </div>
+                        <button type="button" onclick="removeBudgetItem('${itemId}')" class="text-red-500 hover:text-red-700">
+                            <i class="fas fa-times"></i>
+                        </button>
+                        <input type="hidden" name="budgetItems" data-description="${description}" data-value="${value}">
+                    `;
+                    itemDiv.id = `item-${itemId}`;
+                    container.appendChild(itemDiv);
+                });
+            }
+            
+            // Update total
+            updateTotalValue();
+            
+            // Format dates
+            const entryDate = order.entryDate ? order.entryDate.slice(0, 16) : new Date().toISOString().slice(0, 16);
+            document.getElementById('entryDate').value = entryDate;
+            document.getElementById('deliveryDate').value = order.deliveryDate || '';
+            
+            document.getElementById('mechanic').value = order.mechanic || '';
+            document.getElementById('serviceStatus').value = order.status || 'Em andamento';
+            document.getElementById('totalValue').value = order.totalValue || '';
+            document.getElementById('amountReceived').value = order.amountReceived || '';
+            document.getElementById('paymentMethod').value = order.paymentMethod || '';
+            document.getElementById('finalNotes').value = order.notes || '';
+            
+            orderModal.classList.remove('hidden');
+        }
+        
+        // Save order (create or update)
+        function saveOrder(e) {
+            e.preventDefault();
+            
+            // Get form data
+            const id = document.getElementById('orderId').value;
+            const customerName = document.getElementById('customerName').value;
+            const customerPhone = document.getElementById('customerPhone').value;
+            const cpfCnpj = document.getElementById('customerCpfCnpj').value;
+            const vehicleBrand = document.getElementById('vehicleBrand').value;
+            const vehicleModel = document.getElementById('vehicleModel').value;
+            const vehicleYear = document.getElementById('vehicleYear').value;
+            const vehiclePlate = document.getElementById('vehiclePlate').value;
+            const description = document.getElementById('serviceDescription').value;
+            
+            // Get budget items
+            const items = {};
+            const budgetItems = document.querySelectorAll('input[name="budgetItems"]');
+            budgetItems.forEach(item => {
+                const description = item.dataset.description;
+                const value = item.dataset.value;
+                if (description && value) {
+                    items[description] = value;
+                }
+            });
+            
+            const entryDate = document.getElementById('entryDate').value;
+            const deliveryDate = document.getElementById('deliveryDate').value;
+            const mechanic = document.getElementById('mechanic').value;
+            const status = document.getElementById('serviceStatus').value;
+            const totalValue = document.getElementById('totalValue').value;
+            const amountReceived = document.getElementById('amountReceived').value;
+            const paymentMethod = document.getElementById('paymentMethod').value;
+            const notes = document.getElementById('finalNotes').value;
+            
+            // Create order object
+            const order = {
+                id: id ? parseInt(id) : generateId(),
+                customerName,
+                customerPhone,
+                cpfCnpj,
+                vehicleBrand,
+                vehicleModel,
+                vehicleYear,
+                vehiclePlate,
+                description,
+                items,
+                entryDate,
+                deliveryDate,
+                mechanic,
+                status,
+                totalValue,
+                amountReceived,
+                paymentMethod,
+                notes
+            };
+            
+            // Update or add the order
+            if (id) {
+                const index = orders.findIndex(o => o.id === parseInt(id));
+                if (index !== -1) {
+                    orders[index] = order;
+                }
+            } else {
+                orders.push(order);
+            }
+            
+            // Save and render
+            saveOrders();
+            renderOrders(orders);
+            closeOrderModal();
+            
+            // Show success notification
+            showNotification('Ordem salva com sucesso!', 'success');
+        }
+        
+        // Generate new ID for order
+        function generateId() {
+            const maxId = orders.reduce((max, order) => 
+                Math.max(max, order.id), 0
+            );
+            return maxId + 1;
+        }
+        
+        // Delete order
+        function deleteOrder(id) {
+            // Only allow deletion if status is canceled
+            const order = orders.find(o => o.id === id);
+            if (order && order.status !== 'Cancelado') {
+                showNotification('Apenas ordens canceladas podem ser excluídas', 'warning');
+                return;
+            }
+            
+            if (confirm('Tem certeza que deseja excluir esta ordem? Esta ação não pode ser desfeita.')) {
+                orders = orders.filter(order => order.id !== id);
+                saveOrders();
+                renderOrders(orders);
+                
+                // Show success notification
+                showNotification('Ordem excluída com sucesso!', 'success');
+            }
+        }
+        
+        // Open status change modal
+        function openStatusModal(id) {
+            document.getElementById('statusOrderId').value = id;
+            statusModal.classList.remove('hidden');
+        }
+        
+        // Close status modal
+        function closeStatusModal() {
+            statusModal.classList.add('hidden');
+        }
+        
+        // Update order status
+        function updateOrderStatus() {
+            const id = document.getElementById('statusOrderId').value;
+            const newStatus = document.getElementById('newStatus').value;
+            
+            const order = orders.find(o => o.id === parseInt(id));
+            if (order) {
+                order.status = newStatus;
+                saveOrders();
+                renderOrders(orders);
+                
+                // Show success notification
+                showNotification('Status atualizado com sucesso!', 'success');
+            }
+            
+            closeStatusModal();
+        }
+        
+        // Filter orders
+        function filterOrders() {
+            const searchTerm = searchInput.value.toLowerCase();
+            
+            // Get filter values
+            const statusFilter = document.getElementById('filterStatus').value;
+            const startDate = document.getElementById('filterStartDate').value;
+            const endDate = document.getElementById('filterEndDate').value;
+            const mechanicFilter = document.getElementById('filterMechanic').value.toLowerCase();
+            
+            const filtered = orders.filter(order => {
+                // Text search
+                if (searchTerm && 
+                    !order.customerName.toLowerCase().includes(searchTerm) &&
+                    !order.vehiclePlate.toLowerCase().includes(searchTerm) &&
+                    !order.vehicleModel.toLowerCase().includes(searchTerm) &&
+                    order.id.toString() !== searchTerm) {
+                    return false;
+                }
+                
+                // Status filter
+                if (statusFilter && order.status !== statusFilter) {
+                    return false;
+                }
+                
+                // Mechanic filter
+                if (mechanicFilter && (!order.mechanic || !order.mechanic.toLowerCase().includes(mechanicFilter))) {
+                    return false;
+                }
+                
+                // Date range filter
+                const entryDate = new Date(order.entryDate);
+                if (startDate) {
+                    const start = new Date(startDate);
+                    start.setHours(0,0,0,0);
+                    if (entryDate < start) return false;
+                }
+                if (endDate) {
+                    const end = new Date(endDate);
+                    end.setHours(23,59,59,999);
+                    if (entryDate > end) return false;
+                }
+                
+                return true;
+            });
+            
+            renderOrders(filtered);
+        }
+        
+        // Apply filters
+        function applyFilters() {
+            filterOrders();
+        }
+        
+        // Toggle filter panel visibility
+        function toggleFilterPanel() {
+            filterPanel.classList.toggle('hidden');
+        }
+        
+        // Open export/import modal
+        function openExportImportModal() {
+            exportImportModal.classList.remove('hidden');
+        }
+        
+        // Close export/import modal
+        function closeExportImportModal() {
+            exportImportModal.classList.add('hidden');
+        }
+        
+        // Export data to JSON file
+        function exportData() {
+            const dataStr = JSON.stringify(orders);
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            
+            const exportFileDefaultName = `ordens-servico_${new Date().toISOString().slice(0,10)}.json`;
+            
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.click();
+            
+            showNotification('Dados exportados com sucesso!', 'success');
+        }
+        
+        // Import data from JSON file
+        function importData() {
+            if (importFile.files.length === 0) {
+                showNotification('Selecione um arquivo para importar', 'warning');
+                return;
+            }
+            
+            const file = importFile.files[0];
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                try {
+                    const importedOrders = JSON.parse(e.target.result);
+                    
+                    if (!Array.isArray(importedOrders)) {
+                        showNotification('Formato de arquivo inválido', 'danger');
+                        return;
+                    }
+                    
+                    if (confirm('Importar este arquivo substituirá todos os dados atuais. Tem certeza?')) {
+                        orders = importedOrders;
+                        saveOrders();
+                        renderOrders(orders);
+                        
+                        showNotification('Dados importados com sucesso!', 'success');
+                        closeExportImportModal();
+                    }
+                } catch (error) {
+                    showNotification('Erro ao ler o arquivo: ' + error.message, 'danger');
+                }
+            };
+            
+            reader.readAsText(file);
+        }
+        
+        // Show notification
+        function showNotification(message, type) {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = `fixed bottom-4 right-4 px-4 py-3 rounded-lg shadow-md text-white animate-fadeIn z-50`;
+            
+            // Set color based on type
+            switch(type) {
+                case 'success': 
+                    notification.classList.add('bg-green-500');
+                    break;
+                case 'warning':
+                    notification.classList.add('bg-yellow-500');
+                    break;
+                case 'danger':
+                    notification.classList.add('bg-red-500');
+                    break;
+                default:
+                    notification.classList.add('bg-blue-500');
+            }
+            
+            notification.innerHTML = `
+                <div class="flex items-center">
+                    <i class="fas ${type === 'success' ? 'fa-check-circle' : type === 'danger' ? 'fa-exclamation-circle' : 'fa-info-circle'} mr-2"></i>
+                    <span>${message}</span>
+                </div>
+            `;
+            
+            // Add to document
+            document.body.appendChild(notification);
+            
+            // Auto remove after 3 seconds
+            setTimeout(() => {
+                notification.classList.add('opacity-0');
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
+        
+        // Show/hide loading overlay
+        function showLoading(show) {
+            const overlay = document.getElementById('loadingOverlay');
+            overlay.classList.toggle('hidden', !show);
+        }
+
+        // Budget items functions
+        function addBudgetItem() {
+            const description = document.getElementById('itemDescription').value;
+            const value = document.getElementById('itemValue').value;
+            
+            if (!description || !value) {
+                showNotification('Preencha descrição e valor do item', 'warning');
+                return;
+            }
+            
+            const container = document.getElementById('budgetItemsContainer');
+            const itemId = Date.now();
+            
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'flex items-center space-x-2 bg-gray-50 p-2 rounded-lg mb-2';
+            itemDiv.innerHTML = `
+                <div class="flex-1">
+                    <span class="text-sm font-medium">${description}</span>
+                    <span class="text-sm text-gray-500 ml-2">R$ ${parseFloat(value).toFixed(2)}</span>
+                </div>
+                <button type="button" onclick="removeBudgetItem('${itemId}')" class="text-red-500 hover:text-red-700">
+                    <i class="fas fa-times"></i>
+                </button>
+                <input type="hidden" name="budgetItems" data-description="${description}" data-value="${value}">
+            `;
+            itemDiv.id = `item-${itemId}`;
+            
+            container.appendChild(itemDiv);
+            
+            // Clear inputs
+            document.getElementById('itemDescription').value = '';
+            document.getElementById('itemValue').value = '';
+            document.getElementById('itemDescription').focus();
+            
+            // Update total
+            updateTotalValue();
+        }
+        
+        function removeBudgetItem(id) {
+            const item = document.getElementById(`item-${id}`);
+            if (item) {
+                item.remove();
+                updateTotalValue();
+            }
+        }
+        
+        function updateTotalValue() {
+            const items = document.querySelectorAll('input[name="budgetItems"]');
+            let total = 0;
+            
+            items.forEach(item => {
+                total += parseFloat(item.dataset.value) || 0;
+            });
+            
+            document.getElementById('totalValue').value = total.toFixed(2);
+        }
+        
+        // Mask functions
+        function applyPhoneMask(input) {
+            let value = input.value.replace(/\D/g, '');
+            if (value.length > 11) value = value.substring(0, 11);
+            
+            if (value.length > 10) {
+                // Format as (XX) XXXXX-XXXX
+                value = value.replace(/^(\d{2})(\d{5})(\d{4})$/, '($1) $2-$3');
+            } else if (value.length > 6) {
+                // Format as (XX) XXXX-XXXX
+                value = value.replace(/^(\d{2})(\d{4})(\d{4})$/, '($1) $2-$3');
+            } else if (value.length > 2) {
+                // Format as (XX) XXXX
+                value = value.replace(/^(\d{2})(\d{0,4})$/, '($1) $2');
+            } else if (value.length > 0) {
+                // Format as (XX
+                value = value.replace(/^(\d{0,2})$/, '($1');
+            }
+            input.value = value;
+        }
+
+        function applyCpfCnpjMask(input) {
+            let value = input.value.replace(/\D/g, '');
+            
+            if (value.length > 11) {
+                // CNPJ format: XX.XXX.XXX/XXXX-XX
+                value = value.substring(0, 14);
+                value = value.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+            } else {
+                // CPF format: XXX.XXX.XXX-XX
+                value = value.substring(0, 11);
+                value = value.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
+            }
+            input.value = value;
+        }
+    </script>
+</body>
+</html>
